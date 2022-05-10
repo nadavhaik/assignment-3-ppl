@@ -88,7 +88,7 @@ export const evalVarRef = (v: VarRef, env: Env): Result<Value> => {
 
     let val = valRes.value
     if(!isClosure(val))
-        return makeFailure(`Cannot trace a non process expression: ${v.var}`)
+        return makeFailure(`Cannot trace a non closure expression: ${v.var}`)
 
     return makeOk(makeTracedClosure(v.var, val.params, val.body, env))
 }
