@@ -67,6 +67,9 @@ const applicativeEval = (exp: CExp, env: Env): Result<Value> => {
     if(isAppExp(exp)) {
         let a = applicativeEval(exp.rator, env)
         if(isOk(a)) {
+            // return bind(applicativeEval(exp.rator, env), (proc: Value) =>
+            //                         bind(mapResult((rand: CExp) => applicativeEval(rand, env), exp.rands), (args: Value[]) =>
+            //                             applyProcedure(proc, args)))
             let val = a.value
             let b = mapResult((rand: CExp) => applicativeEval(rand, env), exp.rands)
             if(isOk(b)) {
