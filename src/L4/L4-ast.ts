@@ -1,11 +1,11 @@
 // ===========================================================
 // AST type models
-import { map, zipWith } from "ramda";
+import { map, zipWith, pipe } from "ramda";
 import { Sexp, Token } from "s-expression";
 import { allT, first, second, rest, isEmpty } from "../shared/list";
 import { isArray, isString, isNumericString, isIdentifier } from "../shared/type-predicates";
 import { parse as p, isSexpString, isToken } from "../shared/parser";
-import { Result, makeOk, makeFailure, bind, mapResult, mapv } from "../shared/result";
+import {Result, makeOk, makeFailure, bind, mapResult, mapv, isOk} from "../shared/result";
 import { isSymbolSExp, isEmptySExp, isCompoundSExp } from './L4-value-box';
 import { makeEmptySExp, makeSymbolSExp, SExpValue, makeCompoundSExp, valueToString } from './L4-value-box'
 
@@ -34,6 +34,7 @@ import { makeEmptySExp, makeSymbolSExp, SExpValue, makeCompoundSExp, valueToStri
 ;;         |  ( lambda ( <var>* ) <cexp>+ )   / ProcExp(args:VarDecl[], body:CExp[]))
 ;;         |  ( if <cexp> <cexp> <cexp> )     / IfExp(test: CExp, then: CExp, alt: CExp)
 ;;         |  ( let ( <binding>* ) <cexp>+ )  / LetExp(bindings:Binding[], body:CExp[]))
+;;         |  ( trace <var-ref> )             / TraceExp(var: VarRef))
 ;;         |  ( quote <sexp> )                / LitExp(val:SExp)
 ;;         |  ( <cexp> <cexp>* )              / AppExp(operator:CExp, operands:CExp[]))
 ;;         |  ( letrec ( binding*) <cexp>+ )  / LetrecExp(bindings:Bindings[], body: CExp) #### L4
@@ -131,7 +132,7 @@ export const makeSetExp = (v: VarRef, val: CExp): SetExp =>
 
 // HW3
 export const makeTraceExp = (v: VarRef): TraceExp =>
-    // to be completed.
+    ({tag: "TraceExp", var:  v})
 
 // Type predicates for disjoint types
 export const isProgram = (x: any): x is Program => x.tag === "Program";
@@ -156,7 +157,13 @@ export const isLetrecExp = (x: any): x is LetrecExp => x.tag === "LetrecExp";
 export const isSetExp = (x: any): x is SetExp => x.tag === "SetExp";
 
 // HW3
-export const isTraceExp = (x: any): x is TraceExp => // complete this
+export const isTraceExp = (x: any): x is TraceExp => x.tag === "TraceExp"
+const okVal = <T>(res: Result<T>): T => {
+    if(!isOk(res))
+        throw new Error("Res is not an OK!")
+
+    return res.value
+}
 
 // Type predicates for type unions
 export const isExp = (x: any): x is Exp => isDefineExp(x) || isCExp(x);
@@ -249,9 +256,15 @@ const parseProcExp = (vars: Sexp, body: Sexp[]): Result<ProcExp> =>
     isArray(vars) && allT(isString, vars) ? mapv(mapResult(parseL4CExp, body), (cexps: CExp[]) => makeProcExp(map(makeVarDecl, vars), cexps)) :
     makeFailure(`Invalid vars for ProcExp`);
 
+const parseL4ExpVal = pipe(parseL4Exp, okVal)
+
 // HW3
 export const parseTraceExp: (params: Sexp[]) => Result<TraceExp> = 
-    (params) => 
+    (params) => {
+        if(params.length!=1 || !isVarRef(parseL4ExpVal(params[0])))
+            return makeFailure(`illegal arguments: ${params} for trace expression`)
+        return makeOk(parseL4ExpVal(params[0]) as TraceExp)
+    }
         // completer this 
         
 const isGoodBindings = (bindings: Sexp): bindings is [string, Sexp][] =>
