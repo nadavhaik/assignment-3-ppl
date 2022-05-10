@@ -80,6 +80,7 @@ export interface LetrecExp {tag: "LetrecExp"; bindings: Binding[]; body: CExp[];
 export interface SetExp {tag: "SetExp", var: VarRef; val: CExp; }
 // HW3
 export interface TraceExp {tag: "TraceExp", var: VarRef}
+export interface TracedAppExp {tag: "TracedAppExp", exp: AppExp}
 
 // To help parser - define a type for reserved key words.
 // HW3 

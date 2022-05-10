@@ -43,8 +43,11 @@ export const isTrueValue = (x: Value): boolean =>
 
     
 // HW3
-const evalTraceExp = (exp: TraceExp): Result<void> =>
-    // complete this
+const evalTraceExp = (exp: TraceExp): Result<void> => {
+    printPreTrace(exp.var.var)
+    return makeOk((() => {})()) //TODO: CHANGE!!!!
+}
+
 
 // HW3 use these functions
 const printPreTrace = (name: string, vals: Value[], counter: number): void =>
@@ -75,8 +78,11 @@ const applyClosure = (proc: Closure, args: Value[]): Result<Value> => {
     return evalSequence(proc.body, makeExtEnv(vars, args, proc.env));
 }
 
-const applyTracedClosure = (proc: TracedClosure, args: Value[]): Result<Value> => 
-    // complete this
+const applyTracedClosure = (proc: TracedClosure, args: Value[]): Result<Value> => {
+    let res = applyClosure(proc.closure, args)
+
+    return res
+}
 
 
 
