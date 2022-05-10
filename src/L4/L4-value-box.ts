@@ -51,10 +51,10 @@ export interface TracedClosure {
     name: string
 }
 
-export const makeTracedClosure = (closure: Closure, name: string): TracedClosure =>
-    ({tag: "TracedClosure", closure: closure, name: name})
+export const makeTracedClosure = (name: string, params: VarDecl[], body: CExp[], env: Env): TracedClosure =>
+    ({tag: "TracedClosure", name: name, closure: makeClosure(params, body, env)})
     
-export const isTraceClosure = (x: any): x is TracedClosure => 
+export const isTracedClosure = (x: any): x is TracedClosure =>
     x.tag === "TracedClosure"
 
 // @@L4-BOX-VALUE

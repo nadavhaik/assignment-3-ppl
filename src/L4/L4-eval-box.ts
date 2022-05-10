@@ -3,50 +3,103 @@
 // Direct evaluation of letrec with mutation, define supports mutual recursion.
 
 import { map, repeat, zipWith } from "ramda";
-import { isBoolExp, isCExp, isLitExp, isNumExp, isPrimOp, isStrExp, isVarRef, isSetExp,
-         isAppExp, isDefineExp, isIfExp, isLetrecExp, isLetExp, isProcExp, Binding, VarDecl, VarRef, CExp, Exp, IfExp, LetrecExp, LetExp, ProcExp, Program, SetExp,
-         parseL4Exp, DefineExp, isTraceExp as isTraceExp, TraceExp, makeVarRef} from "./L4-ast";
+import {
+    isBoolExp,
+    isCExp,
+    isLitExp,
+    isNumExp,
+    isPrimOp,
+    isStrExp,
+    isVarRef,
+    isSetExp,
+    isAppExp,
+    isDefineExp,
+    isIfExp,
+    isLetrecExp,
+    isLetExp,
+    isProcExp,
+    Binding,
+    VarDecl,
+    VarRef,
+    CExp,
+    Exp,
+    IfExp,
+    LetrecExp,
+    LetExp,
+    ProcExp,
+    Program,
+    SetExp,
+    parseL4Exp,
+    DefineExp,
+    isTraceExp as isTraceExp,
+    TraceExp,
+    makeVarRef,
+    makeTracedExp, AppExp
+} from "./L4-ast";
 import { applyEnv, applyEnvBdg, globalEnvAddBinding, makeExtEnv, setFBinding,
-            theGlobalEnv, Env, FBinding } from "./L4-env-box";
-import { isClosure, makeClosure, Closure, Value, valueToString, TracedClosure, isTraceClosure, makeTracedClosure } from "./L4-value-box";
+            theGlobalEnv, Env, FBinding} from "./L4-env-box";
+import { isClosure, makeClosure, Closure, Value, valueToString, TracedClosure, isTracedClosure, makeTracedClosure } from "./L4-value-box";
 import { applyPrimitive } from "./evalPrimitive-box";
 import { first, rest, isEmpty, cons } from "../shared/list";
-import { Result, bind, mapv, mapResult, makeFailure, makeOk } from "../shared/result";
+import {Result, bind, mapv, mapResult, makeFailure, makeOk, isFailure, isOk} from "../shared/result";
 import { parse as p } from "../shared/parser";
+import {unbox} from "../shared/box";
+import {isString} from "../shared/type-predicates";
 
 // ========================================================
 // Eval functions
 
+let TRACED_RATORS: any = {}
+
 const applicativeEval = (exp: CExp, env: Env): Result<Value> => {
     // console.log(`applicativeEval => exp: ${JSON.stringify(exp)}`)
-    return isNumExp(exp) ? makeOk(exp.val) :
-    isBoolExp(exp) ? makeOk(exp.val) :
-    isStrExp(exp) ? makeOk(exp.val) :
-    isPrimOp(exp) ? makeOk(exp) :
-    isVarRef(exp) ? applyEnv(env, exp.var) :
-    isLitExp(exp) ? makeOk(exp.val as Value) :
-    isIfExp(exp) ? evalIf(exp, env) :
-    isProcExp(exp) ? evalProc(exp, env) :
-    isLetExp(exp) ? evalLet(exp, env) :
-    isLetrecExp(exp) ? evalLetrec(exp, env) :
-    isSetExp(exp) ? evalSet(exp, env) :
-    isAppExp(exp) ? bind(applicativeEval(exp.rator, env), (proc: Value) =>
-                        bind(mapResult((rand: CExp) => applicativeEval(rand, env), exp.rands), (args: Value[]) =>
-                            applyProcedure(proc, args))) :
-    isTraceExp(exp) ? evalTraceExp(exp) : // HW3
-    exp;
+    if(isNumExp(exp)) return makeOk(exp.val)
+    if(isBoolExp(exp)) return  makeOk(exp.val)
+    if(isStrExp(exp)) return  makeOk(exp.val)
+    if(isPrimOp(exp)) return  makeOk(exp)
+    if(isVarRef(exp)) return  evalVarRef(exp, env)
+    if(isLitExp(exp)) return  makeOk(exp.val as Value)
+    if(isIfExp(exp)) return  evalIf(exp, env)
+    if(isProcExp(exp)) return  evalProc(exp, env)
+    if(isLetExp(exp)) return  evalLet(exp, env)
+    if(isLetrecExp(exp)) return  evalLetrec(exp, env)
+    if(isSetExp(exp)) return  evalSet(exp, env)
+    if(isAppExp(exp)) {
+        let a = applicativeEval(exp.rator, env)
+        if(isOk(a)) {
+            let val = a.value
+            let b = mapResult((rand: CExp) => applicativeEval(rand, env), exp.rands)
+            if(isOk(b)) {
+                let c = applyProcedure(val, b.value)
+                return c
+            }
+        }
+        return makeFailure("OMG")
+    }
+    if(isTraceExp(exp)) return  evalTraceExp(exp) // HW3
+    return exp;
 
 }
 
+export const evalVarRef = (v: VarRef, env: Env): Result<Value> => {
+    let valRes = applyEnv(env, v.var)
+    if(isFailure(valRes) || !isTraced(v.var))
+        return valRes
+
+    let val = valRes.value
+    if(!isClosure(val))
+        return makeFailure(`Cannot trace a non process expression: ${v.var}`)
+
+    return makeOk(makeTracedClosure(v.var, val.params, val.body, env))
+}
 export const isTrueValue = (x: Value): boolean =>
     ! (x === false);
 
-    
+const trace = (v: VarRef): void => { TRACED_RATORS[v.var] = 0 }
+const isTraced = (rator: string): boolean => TRACED_RATORS.hasOwnProperty(rator)
+
 // HW3
-const evalTraceExp = (exp: TraceExp): Result<void> => {
-    printPreTrace(exp.var.var)
-    return makeOk((() => {})()) //TODO: CHANGE!!!!
-}
+const evalTraceExp = (exp: TraceExp): Result<void> => makeOk(trace(exp.var))
 
 
 // HW3 use these functions
@@ -70,7 +123,7 @@ const evalProc = (exp: ProcExp, env: Env): Result<Closure> =>
 const applyProcedure = (proc: Value, args: Value[]): Result<Value> =>
     isPrimOp(proc) ? applyPrimitive(proc, args) :
     isClosure(proc) ? applyClosure(proc, args) :
-    isTraceClosure(proc) ? applyTracedClosure(proc, args) :
+    isTracedClosure(proc) ? applyTracedClosure(proc, args) :
     makeFailure(`Bad procedure ${JSON.stringify(proc)}`);
 
 const applyClosure = (proc: Closure, args: Value[]): Result<Value> => {
@@ -79,7 +132,13 @@ const applyClosure = (proc: Closure, args: Value[]): Result<Value> => {
 }
 
 const applyTracedClosure = (proc: TracedClosure, args: Value[]): Result<Value> => {
+    printPreTrace(proc.name, args, TRACED_RATORS[proc.name])
+    TRACED_RATORS[proc.name]++
     let res = applyClosure(proc.closure, args)
+    TRACED_RATORS[proc.name]--
+    if(isOk(res))
+        printPostTrace(res.value, TRACED_RATORS[proc.name])
+
 
     return res
 }
@@ -112,8 +171,10 @@ const evalDefineExps = (def: DefineExp, exps: Exp[]): Result<Value> =>
 
 // Main program
 // L4-BOX @@ Use GE instead of empty-env
-export const evalProgram = (program: Program): Result<Value> =>
-    evalSequence(program.exps, theGlobalEnv);
+export const evalProgram = (program: Program): Result<Value> => {
+    TRACED_RATORS = {}
+    return evalSequence(program.exps, theGlobalEnv);
+}
 
 export const evalParse = (s: string): Result<Value> =>
     bind(p(s), (x) =>

@@ -6,7 +6,7 @@ import { allT, first, second, rest, isEmpty } from "../shared/list";
 import { isArray, isString, isNumericString, isIdentifier } from "../shared/type-predicates";
 import { parse as p, isSexpString, isToken } from "../shared/parser";
 import {Result, makeOk, makeFailure, bind, mapResult, mapv, isOk} from "../shared/result";
-import { isSymbolSExp, isEmptySExp, isCompoundSExp } from './L4-value-box';
+import {isSymbolSExp, isEmptySExp, isCompoundSExp, Value} from './L4-value-box';
 import { makeEmptySExp, makeSymbolSExp, SExpValue, makeCompoundSExp, valueToString } from './L4-value-box'
 
 /*
@@ -80,7 +80,7 @@ export interface LetrecExp {tag: "LetrecExp"; bindings: Binding[]; body: CExp[];
 export interface SetExp {tag: "SetExp", var: VarRef; val: CExp; }
 // HW3
 export interface TraceExp {tag: "TraceExp", var: VarRef}
-export interface TracedAppExp {tag: "TracedAppExp", exp: AppExp}
+export interface TracedExp {tag: "TracedExp", name: string, val: Value, depth: number}
 
 // To help parser - define a type for reserved key words.
 // HW3 
@@ -135,6 +135,12 @@ export const makeSetExp = (v: VarRef, val: CExp): SetExp =>
 export const makeTraceExp = (v: VarRef): TraceExp =>
     ({tag: "TraceExp", var:  v})
 
+export const makeTracedExp = (v: Value, name: string): TracedExp =>
+    ({tag: "TracedExp", name: name, val: v, depth: 0})
+
+export const makeTracedExpWithDepth = (v: Value, name: string, d: number): TracedExp =>
+    ({tag: "TracedExp", name: name, val: v, depth: d})
+
 // Type predicates for disjoint types
 export const isProgram = (x: any): x is Program => x.tag === "Program";
 export const isDefineExp = (x: any): x is DefineExp => x.tag === "DefineExp";
@@ -159,6 +165,7 @@ export const isSetExp = (x: any): x is SetExp => x.tag === "SetExp";
 
 // HW3
 export const isTraceExp = (x: any): x is TraceExp => x.tag === "TraceExp"
+export const isTracedExp = (x: any): x is TracedExp => x.tag === "TracedExp"
 const okVal = <T>(res: Result<T>): T => {
     if(!isOk(res))
         throw new Error("Res is not an OK!")
@@ -262,9 +269,9 @@ const parseL4ExpVal = pipe(parseL4Exp, okVal)
 // HW3
 export const parseTraceExp: (params: Sexp[]) => Result<TraceExp> = 
     (params) => {
-        if(params.length!=1 || !isVarRef(parseL4ExpVal(params[0])))
+        if(params.length!=1 || !isString(params[0]))
             return makeFailure(`illegal arguments: ${params} for trace expression`)
-        return makeOk(parseL4ExpVal(params[0]) as TraceExp)
+        return makeOk(makeTraceExp(makeVarRef(params[0])))
     }
         // completer this 
         
