@@ -54,32 +54,20 @@ import {isString} from "../shared/type-predicates";
 const applicativeEval = (exp: CExp, env: Env,tracedRators: any): Result<Value> => {
     // console.log(`applicativeEval => exp: ${JSON.stringify(exp)}`)
     if(isNumExp(exp)) return makeOk(exp.val)
-    if(isBoolExp(exp)) return  makeOk(exp.val)
-    if(isStrExp(exp)) return  makeOk(exp.val)
-    if(isPrimOp(exp)) return  makeOk(exp)
-    if(isVarRef(exp)) return  evalVarRef(exp, env,tracedRators)
-    if(isLitExp(exp)) return  makeOk(exp.val as Value)
-    if(isIfExp(exp)) return  evalIf(exp, env,tracedRators)
-    if(isProcExp(exp)) return  evalProc(exp, env)
-    if(isLetExp(exp)) return  evalLet(exp, env,tracedRators)
-    if(isLetrecExp(exp)) return  evalLetrec(exp, env,tracedRators)
-    if(isSetExp(exp)) return  evalSet(exp, env,tracedRators)
-    if(isAppExp(exp)) {
-        let a = applicativeEval(exp.rator, env,tracedRators)
-        if(isOk(a)) {
-            // return bind(applicativeEval(exp.rator, env), (proc: Value) =>
-            //                         bind(mapResult((rand: CExp) => applicativeEval(rand, env), exp.rands), (args: Value[]) =>
-            //                             applyProcedure(proc, args)))
-            let val = a.value
-            let b = mapResult((rand: CExp) => applicativeEval(rand, env,tracedRators), exp.rands)
-            if(isOk(b)) {
-                let c = applyProcedure(val, b.value,tracedRators)
-                return c
-            }
-        }
-        return makeFailure("OMG")
-    }
-    if(isTraceExp(exp)) return  evalTraceExp(exp,tracedRators) // HW3
+    if(isBoolExp(exp)) return makeOk(exp.val)
+    if(isStrExp(exp)) return makeOk(exp.val)
+    if(isPrimOp(exp)) return makeOk(exp)
+    if(isVarRef(exp)) return evalVarRef(exp, env,tracedRators)
+    if(isLitExp(exp)) return makeOk(exp.val as Value)
+    if(isIfExp(exp)) return evalIf(exp, env,tracedRators)
+    if(isProcExp(exp)) return evalProc(exp, env)
+    if(isLetExp(exp)) return evalLet(exp, env,tracedRators)
+    if(isLetrecExp(exp)) return evalLetrec(exp, env,tracedRators)
+    if(isSetExp(exp)) return evalSet(exp, env,tracedRators)
+    if(isAppExp(exp)) return bind(applicativeEval(exp.rator, env, tracedRators), (proc: Value) =>
+                bind(mapResult((rand: CExp) => applicativeEval(rand, env, tracedRators), exp.rands), (args: Value[]) =>
+                    applyProcedure(proc, args, tracedRators)))
+    if(isTraceExp(exp)) return evalTraceExp(exp,tracedRators) // HW3
     return exp;
 
 }
