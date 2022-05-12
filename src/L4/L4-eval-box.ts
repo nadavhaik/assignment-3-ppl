@@ -49,9 +49,9 @@ import {isString} from "../shared/type-predicates";
 // ========================================================
 // Eval functions
 
-let TRACED_RATORS: any = {}
+//let TRACED_RATORS: any = {} // THIS SHOULD CHANGE
 
-const applicativeEval = (exp: CExp, env: Env): Result<Value> => {
+const applicativeEval = (exp: CExp, env: Env,TRACED_RATORS: any): Result<Value> => {
     // console.log(`applicativeEval => exp: ${JSON.stringify(exp)}`)
     if(isNumExp(exp)) return makeOk(exp.val)
     if(isBoolExp(exp)) return  makeOk(exp.val)
@@ -65,10 +65,10 @@ const applicativeEval = (exp: CExp, env: Env): Result<Value> => {
     if(isLetrecExp(exp)) return  evalLetrec(exp, env)
     if(isSetExp(exp)) return  evalSet(exp, env)
     if(isAppExp(exp)) {
-        let a = applicativeEval(exp.rator, env)
+        let a = applicativeEval(exp.rator, env,TRACED_RATORS)
         if(isOk(a)) {
             let val = a.value
-            let b = mapResult((rand: CExp) => applicativeEval(rand, env), exp.rands)
+            let b = mapResult((rand: CExp) => applicativeEval(rand, env,TRACED_RATORS), exp.rands)
             if(isOk(b)) {
                 let c = applyProcedure(val, b.value)
                 return c
@@ -76,14 +76,14 @@ const applicativeEval = (exp: CExp, env: Env): Result<Value> => {
         }
         return makeFailure("OMG")
     }
-    if(isTraceExp(exp)) return  evalTraceExp(exp) // HW3
+    if(isTraceExp(exp)) return  evalTraceExp(exp,TRACED_RATORS) // HW3
     return exp;
 
 }
 
-export const evalVarRef = (v: VarRef, env: Env): Result<Value> => {
+export const evalVarRef = (v: VarRef, env: Env, TRACED_RATORES: any): Result<Value> => {
     let valRes = applyEnv(env, v.var)
-    if(isFailure(valRes) || !isTraced(v.var))
+    if(isFailure(valRes) || !isTraced(v.var,TRACED_RATORES))
         return valRes
 
     let val = valRes.value
@@ -95,11 +95,11 @@ export const evalVarRef = (v: VarRef, env: Env): Result<Value> => {
 export const isTrueValue = (x: Value): boolean =>
     ! (x === false);
 
-const trace = (v: VarRef): void => { TRACED_RATORS[v.var] = 0 }
-const isTraced = (rator: string): boolean => TRACED_RATORS.hasOwnProperty(rator)
+const trace = (v: VarRef, TRACED_RATORS: any): void => { TRACED_RATORS[v.var] = 0 }
+const isTraced = (rator: string,TRACED_RATORS: any): boolean => TRACED_RATORS.hasOwnProperty(rator)
 
 // HW3
-const evalTraceExp = (exp: TraceExp): Result<void> => makeOk(trace(exp.var))
+const evalTraceExp = (exp: TraceExp,TRACED_RATORS: any): Result<void> => makeOk(trace(exp.var,TRACED_RATORS))
 
 
 // HW3 use these functions
@@ -110,10 +110,10 @@ const printPostTrace = (val: Value, counter: number): void =>
     console.log(`<${" <".repeat(counter)} ${val}`)
 
 
-const evalIf = (exp: IfExp, env: Env): Result<Value> =>
-    bind(applicativeEval(exp.test, env), (test: Value) => 
-        isTrueValue(test) ? applicativeEval(exp.then, env) : 
-        applicativeEval(exp.alt, env));
+const evalIf = (exp: IfExp, env: Env,TRACED_RATORS: any): Result<Value> =>
+    bind(applicativeEval(exp.test, env,TRACED_RATORS), (test: Value) =>
+        isTrueValue(test) ? applicativeEval(exp.then, env,TRACED_RATORS) :
+        applicativeEval(exp.alt, env,TRACED_RATORS));
 
 const evalProc = (exp: ProcExp, env: Env): Result<Closure> =>
     makeOk(makeClosure(exp.args, exp.body, env));
@@ -131,7 +131,7 @@ const applyClosure = (proc: Closure, args: Value[]): Result<Value> => {
     return evalSequence(proc.body, makeExtEnv(vars, args, proc.env));
 }
 
-const applyTracedClosure = (proc: TracedClosure, args: Value[]): Result<Value> => {
+const applyTracedClosure = (proc: TracedClosure, args: Value[],TRACED_RATORS: any): Result<Value> => {
     printPreTrace(proc.name, args, TRACED_RATORS[proc.name])
     TRACED_RATORS[proc.name]++
     let res = applyClosure(proc.closure, args)
@@ -172,7 +172,6 @@ const evalDefineExps = (def: DefineExp, exps: Exp[]): Result<Value> =>
 // Main program
 // L4-BOX @@ Use GE instead of empty-env
 export const evalProgram = (program: Program): Result<Value> => {
-    TRACED_RATORS = {}
     return evalSequence(program.exps, theGlobalEnv);
 }
 
