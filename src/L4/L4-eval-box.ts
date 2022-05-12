@@ -125,19 +125,19 @@ const evalProc = (exp: ProcExp, env: Env): Result<Closure> =>
 //      Instead we use the env of the closure.
 const applyProcedure = (proc: Value, args: Value[],tracedRators: any): Result<Value> =>
     isPrimOp(proc) ? applyPrimitive(proc, args) :
-    isClosure(proc) ? applyClosure(proc, args) :
+    isClosure(proc) ? applyClosure(proc, args, tracedRators) :
     isTracedClosure(proc) ? applyTracedClosure(proc, args,tracedRators) :
     makeFailure(`Bad procedure ${JSON.stringify(proc)}`);
 
-const applyClosure = (proc: Closure, args: Value[]): Result<Value> => {
+const applyClosure = (proc: Closure, args: Value[], tracedRators: any): Result<Value> => {
     const vars = map((v: VarDecl) => v.var, proc.params);
-    return evalSequence(proc.body, makeExtEnv(vars, args, proc.env),{});
+    return evalSequence(proc.body, makeExtEnv(vars, args, proc.env), tracedRators);
 }
 
 const applyTracedClosure = (proc: TracedClosure, args: Value[],tracedRators: any): Result<Value> => {
     printPreTrace(proc.name, args, tracedRators[proc.name])
     tracedRators[proc.name]++
-    let res = applyClosure(proc.closure, args)
+    let res = applyClosure(proc.closure, args, tracedRators)
     tracedRators[proc.name]--
     if(isOk(res))
         printPostTrace(res.value, tracedRators[proc.name])
