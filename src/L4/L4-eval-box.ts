@@ -57,13 +57,13 @@ const applicativeEval = (exp: CExp, env: Env,TRACED_RATORS: any): Result<Value> 
     if(isBoolExp(exp)) return  makeOk(exp.val)
     if(isStrExp(exp)) return  makeOk(exp.val)
     if(isPrimOp(exp)) return  makeOk(exp)
-    if(isVarRef(exp)) return  evalVarRef(exp, env)
+    if(isVarRef(exp)) return  evalVarRef(exp, env,TRACED_RATORS)
     if(isLitExp(exp)) return  makeOk(exp.val as Value)
-    if(isIfExp(exp)) return  evalIf(exp, env)
+    if(isIfExp(exp)) return  evalIf(exp, env,TRACED_RATORS)
     if(isProcExp(exp)) return  evalProc(exp, env)
-    if(isLetExp(exp)) return  evalLet(exp, env)
-    if(isLetrecExp(exp)) return  evalLetrec(exp, env)
-    if(isSetExp(exp)) return  evalSet(exp, env)
+    if(isLetExp(exp)) return  evalLet(exp, env,TRACED_RATORS)
+    if(isLetrecExp(exp)) return  evalLetrec(exp, env,TRACED_RATORS)
+    if(isSetExp(exp)) return  evalSet(exp, env,TRACED_RATORS)
     if(isAppExp(exp)) {
         let a = applicativeEval(exp.rator, env,TRACED_RATORS)
         if(isOk(a)) {
@@ -73,7 +73,7 @@ const applicativeEval = (exp: CExp, env: Env,TRACED_RATORS: any): Result<Value> 
             let val = a.value
             let b = mapResult((rand: CExp) => applicativeEval(rand, env,TRACED_RATORS), exp.rands)
             if(isOk(b)) {
-                let c = applyProcedure(val, b.value)
+                let c = applyProcedure(val, b.value,TRACED_RATORS)
                 return c
             }
         }
@@ -123,15 +123,15 @@ const evalProc = (exp: ProcExp, env: Env): Result<Closure> =>
 
 // KEY: This procedure does NOT have an env parameter.
 //      Instead we use the env of the closure.
-const applyProcedure = (proc: Value, args: Value[]): Result<Value> =>
+const applyProcedure = (proc: Value, args: Value[],TRACED_RATORS: any): Result<Value> =>
     isPrimOp(proc) ? applyPrimitive(proc, args) :
     isClosure(proc) ? applyClosure(proc, args) :
-    isTracedClosure(proc) ? applyTracedClosure(proc, args) :
+    isTracedClosure(proc) ? applyTracedClosure(proc, args,TRACED_RATORS) :
     makeFailure(`Bad procedure ${JSON.stringify(proc)}`);
 
 const applyClosure = (proc: Closure, args: Value[]): Result<Value> => {
     const vars = map((v: VarDecl) => v.var, proc.params);
-    return evalSequence(proc.body, makeExtEnv(vars, args, proc.env));
+    return evalSequence(proc.body, makeExtEnv(vars, args, proc.env),{});
 }
 
 const applyTracedClosure = (proc: TracedClosure, args: Value[],TRACED_RATORS: any): Result<Value> => {
@@ -149,15 +149,15 @@ const applyTracedClosure = (proc: TracedClosure, args: Value[],TRACED_RATORS: an
 
 
 // Evaluate a sequence of expressions (in a program)
-export const evalSequence = (seq: Exp[], env: Env): Result<Value> => {
+export const evalSequence = (seq: Exp[], env: Env,TRACED_RATORS:any): Result<Value> => {
     // console.log(`evalSequence => exp: ${JSON.stringify(seq)}`)
-    return isEmpty(seq) ? makeFailure("Empty program") : evalCExps(first(seq), rest(seq), env);
+    return isEmpty(seq) ? makeFailure("Empty program") : evalCExps(first(seq), rest(seq), env,TRACED_RATORS);
 }
     
-const evalCExps = (first: Exp, rest: Exp[], env: Env): Result<Value> =>
-    isDefineExp(first) ? evalDefineExps(first, rest) :
-    isCExp(first) && isEmpty(rest) ? applicativeEval(first, env) :
-    isCExp(first) ? bind(applicativeEval(first, env), _ => evalSequence(rest, env)) :
+const evalCExps = (first: Exp, rest: Exp[], env: Env,TRACED_RATORS:any): Result<Value> =>
+    isDefineExp(first) ? evalDefineExps(first, rest,TRACED_RATORS) :
+    isCExp(first) && isEmpty(rest) ? applicativeEval(first, env,TRACED_RATORS) :
+    isCExp(first) ? bind(applicativeEval(first, env,TRACED_RATORS), _ => evalSequence(rest, env,TRACED_RATORS)) :
     first;
 
 // Eval a sequence of expressions when the first exp is a Define.
@@ -166,29 +166,29 @@ const evalCExps = (first: Exp, rest: Exp[], env: Env): Result<Value> =>
 // L4-BOX @@
 // define always updates theGlobalEnv
 // We also only expect defineExps at the top level.
-const evalDefineExps = (def: DefineExp, exps: Exp[]): Result<Value> =>
-    bind(applicativeEval(def.val, theGlobalEnv), (rhs: Value) => { 
+const evalDefineExps = (def: DefineExp, exps: Exp[],TRACED_RATORS:any): Result<Value> =>
+    bind(applicativeEval(def.val, theGlobalEnv,TRACED_RATORS), (rhs: Value) => {
             globalEnvAddBinding(def.var.var, rhs);
-            return evalSequence(exps, theGlobalEnv); 
+            return evalSequence(exps, theGlobalEnv,TRACED_RATORS);
         });
 
 // Main program
 // L4-BOX @@ Use GE instead of empty-env
 export const evalProgram = (program: Program): Result<Value> => {
-    return evalSequence(program.exps, theGlobalEnv);
+    return evalSequence(program.exps, theGlobalEnv,{});
 }
 
 export const evalParse = (s: string): Result<Value> =>
     bind(p(s), (x) =>
             bind(parseL4Exp(x), (exp: Exp) =>
-                evalSequence([exp], theGlobalEnv)));
+                evalSequence([exp], theGlobalEnv,{})));
 
 // LET: Direct evaluation rule without syntax expansion
 // compute the values, extend the env, eval the body.
-const evalLet = (exp: LetExp, env: Env): Result<Value> => {
-    const vals = mapResult((v: CExp) => applicativeEval(v, env), map((b: Binding) => b.val, exp.bindings));
+const evalLet = (exp: LetExp, env: Env,TRACED_RATORS: any): Result<Value> => {
+    const vals = mapResult((v: CExp) => applicativeEval(v, env,TRACED_RATORS), map((b: Binding) => b.val, exp.bindings));
     const vars = map((b: Binding) => b.var.var, exp.bindings);
-    return bind(vals, (vals: Value[]) => evalSequence(exp.body, makeExtEnv(vars, vals, env)));
+    return bind(vals, (vals: Value[]) => evalSequence(exp.body, makeExtEnv(vars, vals, env),TRACED_RATORS));
 }
 
 // @@ L4-EVAL-BOX 
@@ -197,20 +197,20 @@ const evalLet = (exp: LetExp, env: Env): Result<Value> => {
 // 2. compute the vals in the new extended env
 // 3. update the bindings of the vars to the computed vals
 // 4. compute body in extended env
-const evalLetrec = (exp: LetrecExp, env: Env): Result<Value> => {
+const evalLetrec = (exp: LetrecExp, env: Env,TRACED_RATORS: any): Result<Value> => {
     const vars = map((b: Binding) => b.var.var, exp.bindings);
     const vals = map((b: Binding) => b.val, exp.bindings);
     const extEnv = makeExtEnv(vars, repeat(undefined, vars.length), env);
     // @@ Compute the vals in the extended env
-    const cvalsResult = mapResult((v: CExp) => applicativeEval(v, extEnv), vals);
+    const cvalsResult = mapResult((v: CExp) => applicativeEval(v, extEnv,TRACED_RATORS), vals);
     const result = mapv(cvalsResult, (cvals: Value[]) => 
                         zipWith((bdg, cval) => setFBinding(bdg, cval), extEnv.frame.fbindings, cvals));
-    return bind(result, _ => evalSequence(exp.body, extEnv));
+    return bind(result, _ => evalSequence(exp.body, extEnv,TRACED_RATORS));
 };
 
 // L4-eval-box: Handling of mutation with set!
-const evalSet = (exp: SetExp, env: Env): Result<void> =>
-    bind(applicativeEval(exp.val, env), (val: Value) =>
+const evalSet = (exp: SetExp, env: Env,TRACED_RATORS:any): Result<void> =>
+    bind(applicativeEval(exp.val, env,TRACED_RATORS), (val: Value) =>
         mapv(applyEnvBdg(env, exp.var.var), (bdg: FBinding) =>
             setFBinding(bdg, val)));
 
