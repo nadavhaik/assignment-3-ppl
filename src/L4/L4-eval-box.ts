@@ -51,42 +51,42 @@ import {isString} from "../shared/type-predicates";
 
 //let TRACED_RATORS: any = {} // THIS SHOULD CHANGE
 
-const applicativeEval = (exp: CExp, env: Env,TRACED_RATORS: any): Result<Value> => {
+const applicativeEval = (exp: CExp, env: Env,tracedRators: any): Result<Value> => {
     // console.log(`applicativeEval => exp: ${JSON.stringify(exp)}`)
     if(isNumExp(exp)) return makeOk(exp.val)
     if(isBoolExp(exp)) return  makeOk(exp.val)
     if(isStrExp(exp)) return  makeOk(exp.val)
     if(isPrimOp(exp)) return  makeOk(exp)
-    if(isVarRef(exp)) return  evalVarRef(exp, env,TRACED_RATORS)
+    if(isVarRef(exp)) return  evalVarRef(exp, env,tracedRators)
     if(isLitExp(exp)) return  makeOk(exp.val as Value)
-    if(isIfExp(exp)) return  evalIf(exp, env,TRACED_RATORS)
+    if(isIfExp(exp)) return  evalIf(exp, env,tracedRators)
     if(isProcExp(exp)) return  evalProc(exp, env)
-    if(isLetExp(exp)) return  evalLet(exp, env,TRACED_RATORS)
-    if(isLetrecExp(exp)) return  evalLetrec(exp, env,TRACED_RATORS)
-    if(isSetExp(exp)) return  evalSet(exp, env,TRACED_RATORS)
+    if(isLetExp(exp)) return  evalLet(exp, env,tracedRators)
+    if(isLetrecExp(exp)) return  evalLetrec(exp, env,tracedRators)
+    if(isSetExp(exp)) return  evalSet(exp, env,tracedRators)
     if(isAppExp(exp)) {
-        let a = applicativeEval(exp.rator, env,TRACED_RATORS)
+        let a = applicativeEval(exp.rator, env,tracedRators)
         if(isOk(a)) {
             // return bind(applicativeEval(exp.rator, env), (proc: Value) =>
             //                         bind(mapResult((rand: CExp) => applicativeEval(rand, env), exp.rands), (args: Value[]) =>
             //                             applyProcedure(proc, args)))
             let val = a.value
-            let b = mapResult((rand: CExp) => applicativeEval(rand, env,TRACED_RATORS), exp.rands)
+            let b = mapResult((rand: CExp) => applicativeEval(rand, env,tracedRators), exp.rands)
             if(isOk(b)) {
-                let c = applyProcedure(val, b.value,TRACED_RATORS)
+                let c = applyProcedure(val, b.value,tracedRators)
                 return c
             }
         }
         return makeFailure("OMG")
     }
-    if(isTraceExp(exp)) return  evalTraceExp(exp,TRACED_RATORS) // HW3
+    if(isTraceExp(exp)) return  evalTraceExp(exp,tracedRators) // HW3
     return exp;
 
 }
 
-export const evalVarRef = (v: VarRef, env: Env, TRACED_RATORES: any): Result<Value> => {
+export const evalVarRef = (v: VarRef, env: Env, tracedRators: any): Result<Value> => {
     let valRes = applyEnv(env, v.var)
-    if(isFailure(valRes) || !isTraced(v.var,TRACED_RATORES))
+    if(isFailure(valRes) || !isTraced(v.var,tracedRators))
         return valRes
 
     let val = valRes.value
@@ -98,11 +98,11 @@ export const evalVarRef = (v: VarRef, env: Env, TRACED_RATORES: any): Result<Val
 export const isTrueValue = (x: Value): boolean =>
     ! (x === false);
 
-const trace = (v: VarRef, TRACED_RATORS: any): void => { TRACED_RATORS[v.var] = 0 }
-const isTraced = (rator: string,TRACED_RATORS: any): boolean => TRACED_RATORS.hasOwnProperty(rator)
+const trace = (v: VarRef, tracedRators: any): void => { tracedRators[v.var] = 0 }
+const isTraced = (rator: string,tracedRators: any): boolean => tracedRators.hasOwnProperty(rator)
 
 // HW3
-const evalTraceExp = (exp: TraceExp,TRACED_RATORS: any): Result<void> => makeOk(trace(exp.var,TRACED_RATORS))
+const evalTraceExp = (exp: TraceExp,tracedRators: any): Result<void> => makeOk(trace(exp.var,tracedRators))
 
 
 // HW3 use these functions
@@ -113,20 +113,20 @@ const printPostTrace = (val: Value, counter: number): void =>
     console.log(`<${" <".repeat(counter)} ${val}`)
 
 
-const evalIf = (exp: IfExp, env: Env,TRACED_RATORS: any): Result<Value> =>
-    bind(applicativeEval(exp.test, env,TRACED_RATORS), (test: Value) =>
-        isTrueValue(test) ? applicativeEval(exp.then, env,TRACED_RATORS) :
-        applicativeEval(exp.alt, env,TRACED_RATORS));
+const evalIf = (exp: IfExp, env: Env, tracedRators: any): Result<Value> =>
+    bind(applicativeEval(exp.test, env,tracedRators), (test: Value) =>
+        isTrueValue(test) ? applicativeEval(exp.then, env,tracedRators) :
+        applicativeEval(exp.alt, env,tracedRators));
 
 const evalProc = (exp: ProcExp, env: Env): Result<Closure> =>
     makeOk(makeClosure(exp.args, exp.body, env));
 
 // KEY: This procedure does NOT have an env parameter.
 //      Instead we use the env of the closure.
-const applyProcedure = (proc: Value, args: Value[],TRACED_RATORS: any): Result<Value> =>
+const applyProcedure = (proc: Value, args: Value[],tracedRators: any): Result<Value> =>
     isPrimOp(proc) ? applyPrimitive(proc, args) :
     isClosure(proc) ? applyClosure(proc, args) :
-    isTracedClosure(proc) ? applyTracedClosure(proc, args,TRACED_RATORS) :
+    isTracedClosure(proc) ? applyTracedClosure(proc, args,tracedRators) :
     makeFailure(`Bad procedure ${JSON.stringify(proc)}`);
 
 const applyClosure = (proc: Closure, args: Value[]): Result<Value> => {
@@ -134,13 +134,13 @@ const applyClosure = (proc: Closure, args: Value[]): Result<Value> => {
     return evalSequence(proc.body, makeExtEnv(vars, args, proc.env),{});
 }
 
-const applyTracedClosure = (proc: TracedClosure, args: Value[],TRACED_RATORS: any): Result<Value> => {
-    printPreTrace(proc.name, args, TRACED_RATORS[proc.name])
-    TRACED_RATORS[proc.name]++
+const applyTracedClosure = (proc: TracedClosure, args: Value[],tracedRators: any): Result<Value> => {
+    printPreTrace(proc.name, args, tracedRators[proc.name])
+    tracedRators[proc.name]++
     let res = applyClosure(proc.closure, args)
-    TRACED_RATORS[proc.name]--
+    tracedRators[proc.name]--
     if(isOk(res))
-        printPostTrace(res.value, TRACED_RATORS[proc.name])
+        printPostTrace(res.value, tracedRators[proc.name])
 
 
     return res
@@ -149,15 +149,15 @@ const applyTracedClosure = (proc: TracedClosure, args: Value[],TRACED_RATORS: an
 
 
 // Evaluate a sequence of expressions (in a program)
-export const evalSequence = (seq: Exp[], env: Env,TRACED_RATORS:any): Result<Value> => {
+export const evalSequence = (seq: Exp[], env: Env,tracedRators:any): Result<Value> => {
     // console.log(`evalSequence => exp: ${JSON.stringify(seq)}`)
-    return isEmpty(seq) ? makeFailure("Empty program") : evalCExps(first(seq), rest(seq), env,TRACED_RATORS);
+    return isEmpty(seq) ? makeFailure("Empty program") : evalCExps(first(seq), rest(seq), env,tracedRators);
 }
     
-const evalCExps = (first: Exp, rest: Exp[], env: Env,TRACED_RATORS:any): Result<Value> =>
-    isDefineExp(first) ? evalDefineExps(first, rest,TRACED_RATORS) :
-    isCExp(first) && isEmpty(rest) ? applicativeEval(first, env,TRACED_RATORS) :
-    isCExp(first) ? bind(applicativeEval(first, env,TRACED_RATORS), _ => evalSequence(rest, env,TRACED_RATORS)) :
+const evalCExps = (first: Exp, rest: Exp[], env: Env,tracedRators:any): Result<Value> =>
+    isDefineExp(first) ? evalDefineExps(first, rest,tracedRators) :
+    isCExp(first) && isEmpty(rest) ? applicativeEval(first, env,tracedRators) :
+    isCExp(first) ? bind(applicativeEval(first, env,tracedRators), _ => evalSequence(rest, env,tracedRators)) :
     first;
 
 // Eval a sequence of expressions when the first exp is a Define.
@@ -166,10 +166,10 @@ const evalCExps = (first: Exp, rest: Exp[], env: Env,TRACED_RATORS:any): Result<
 // L4-BOX @@
 // define always updates theGlobalEnv
 // We also only expect defineExps at the top level.
-const evalDefineExps = (def: DefineExp, exps: Exp[],TRACED_RATORS:any): Result<Value> =>
-    bind(applicativeEval(def.val, theGlobalEnv,TRACED_RATORS), (rhs: Value) => {
+const evalDefineExps = (def: DefineExp, exps: Exp[],tracedRators:any): Result<Value> =>
+    bind(applicativeEval(def.val, theGlobalEnv,tracedRators), (rhs: Value) => {
             globalEnvAddBinding(def.var.var, rhs);
-            return evalSequence(exps, theGlobalEnv,TRACED_RATORS);
+            return evalSequence(exps, theGlobalEnv,tracedRators);
         });
 
 // Main program
@@ -185,10 +185,10 @@ export const evalParse = (s: string): Result<Value> =>
 
 // LET: Direct evaluation rule without syntax expansion
 // compute the values, extend the env, eval the body.
-const evalLet = (exp: LetExp, env: Env,TRACED_RATORS: any): Result<Value> => {
-    const vals = mapResult((v: CExp) => applicativeEval(v, env,TRACED_RATORS), map((b: Binding) => b.val, exp.bindings));
+const evalLet = (exp: LetExp, env: Env,tracedRators: any): Result<Value> => {
+    const vals = mapResult((v: CExp) => applicativeEval(v, env,tracedRators), map((b: Binding) => b.val, exp.bindings));
     const vars = map((b: Binding) => b.var.var, exp.bindings);
-    return bind(vals, (vals: Value[]) => evalSequence(exp.body, makeExtEnv(vars, vals, env),TRACED_RATORS));
+    return bind(vals, (vals: Value[]) => evalSequence(exp.body, makeExtEnv(vars, vals, env),tracedRators));
 }
 
 // @@ L4-EVAL-BOX 
@@ -197,20 +197,20 @@ const evalLet = (exp: LetExp, env: Env,TRACED_RATORS: any): Result<Value> => {
 // 2. compute the vals in the new extended env
 // 3. update the bindings of the vars to the computed vals
 // 4. compute body in extended env
-const evalLetrec = (exp: LetrecExp, env: Env,TRACED_RATORS: any): Result<Value> => {
+const evalLetrec = (exp: LetrecExp, env: Env,tracedRators: any): Result<Value> => {
     const vars = map((b: Binding) => b.var.var, exp.bindings);
     const vals = map((b: Binding) => b.val, exp.bindings);
     const extEnv = makeExtEnv(vars, repeat(undefined, vars.length), env);
     // @@ Compute the vals in the extended env
-    const cvalsResult = mapResult((v: CExp) => applicativeEval(v, extEnv,TRACED_RATORS), vals);
+    const cvalsResult = mapResult((v: CExp) => applicativeEval(v, extEnv,tracedRators), vals);
     const result = mapv(cvalsResult, (cvals: Value[]) => 
                         zipWith((bdg, cval) => setFBinding(bdg, cval), extEnv.frame.fbindings, cvals));
-    return bind(result, _ => evalSequence(exp.body, extEnv,TRACED_RATORS));
+    return bind(result, _ => evalSequence(exp.body, extEnv,tracedRators));
 };
 
 // L4-eval-box: Handling of mutation with set!
-const evalSet = (exp: SetExp, env: Env,TRACED_RATORS:any): Result<void> =>
-    bind(applicativeEval(exp.val, env,TRACED_RATORS), (val: Value) =>
+const evalSet = (exp: SetExp, env: Env,tracedRators:any): Result<void> =>
+    bind(applicativeEval(exp.val, env,tracedRators), (val: Value) =>
         mapv(applyEnvBdg(env, exp.var.var), (bdg: FBinding) =>
             setFBinding(bdg, val)));
 
