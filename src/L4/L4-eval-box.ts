@@ -49,8 +49,6 @@ import {isString} from "../shared/type-predicates";
 // ========================================================
 // Eval functions
 
-//let TRACED_RATORS: any = {} // THIS SHOULD CHANGE
-
 const applicativeEval = (exp: CExp, env: Env,tracedRators: any): Result<Value> => {
     // console.log(`applicativeEval => exp: ${JSON.stringify(exp)}`)
     if(isNumExp(exp)) return makeOk(exp.val)
